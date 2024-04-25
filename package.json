@@ -1,0 +1,16 @@
+{
+  "name": "telegramuserbot",
+  "module": "index.ts",
+  "dependencies": {
+    "input": "^1.0.1",
+    "natural": "^7.0.5",
+    "telegram": "^2.20.15"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "type": "module",
+  "devDependencies": {
+    "bun-types": "^1.1.4"
+  }
+}
