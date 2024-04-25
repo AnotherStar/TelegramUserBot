@@ -51,8 +51,7 @@ const initializeClient = async (): Promise<TelegramClient> => {
 
     loadData();
     data.restart++;
-    console.log(data);
-    setInterval(saveData, 1000);
+    setInterval(saveData, 10000);
 
     return client;
 };
