@@ -106,7 +106,15 @@ initializeClient().then(async client => {
                 //@ts-ignore
                 const count: string | number = result.count || '---';
 
+                console.log({
+                    message: event.message.message,
+                    reason,
+                    count,
+                });
+
                 if (typeof count === 'number' && count > 10) return;
+
+                console.log(`Сообщение будет удалено`);
 
                 data.banCounter++;
 
