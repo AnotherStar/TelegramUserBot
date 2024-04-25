@@ -82,6 +82,14 @@ const checkRestrictedWords = (message: string): string | undefined => {
     if (stopWords.length) return `запрещенные слова (${stopWords.join(', ')})`;
 };
 
+const checkRestrictedMixes = (message: string): string | undefined => {
+    const mixedWord = natural.PorterStemmerRu.tokenizeAndStem(message).find(
+        word => /[A-z]/.test(word) && /[А-я]/.test(word),
+    );
+
+    if (mixedWord) return `смешение латиницы и кириллицы в слове "${mixedWord}"`;
+};
+
 initializeClient().then(async client => {
     client.addEventHandler(async (event: NewMessageEvent) => {
         if (event instanceof Api.UpdateNewChannelMessage) {
@@ -91,7 +99,8 @@ initializeClient().then(async client => {
 
             let reason =
                 checkRestrictedLetters(event.message.message) ||
-                checkRestrictedWords(event.message.message);
+                checkRestrictedWords(event.message.message) ||
+                checkRestrictedMixes(event.message.message);
 
             if (reason) {
                 const result = await client.invoke(
