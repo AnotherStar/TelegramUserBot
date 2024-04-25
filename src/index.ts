@@ -3,7 +3,7 @@ import input from 'input';
 import * as fs from 'fs';
 import { NewMessageEvent } from 'telegram/events';
 import { Dialog } from 'telegram/tl/custom/dialog';
-import * as natural from 'natural';
+import natural from 'natural';
 import { StringSession } from 'telegram/sessions/index.js';
 
 const APP_ID = parseInt(process.env.APP_ID || '');
