@@ -1,6 +1,9 @@
 {
     "name": "telegram-user-bot",
-    "module": "index.ts",
+    "module": "dist/index.ts",
+    "scripts": {
+        "start": "node dist/index.js"
+    },
     "dependencies": {
         "input": "^1.0.1",
         "natural": "^7.0.5",
