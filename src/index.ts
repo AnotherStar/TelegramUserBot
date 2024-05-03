@@ -11,7 +11,21 @@ const API_HASH = process.env.API_HASH;
 let client: TelegramClient;
 let dialog: Dialog;
 
-const data = { stopWords: [], banCounter: 0, restart: 0, restrictedLetters: [] };
+const data: {
+    stopWords: {
+        [key: string]: number;
+    };
+    banCounter: number;
+    restart: number;
+    restrictedLetters: {
+        [key: string]: number;
+    };
+} = {
+    stopWords: {},
+    banCounter: 0,
+    restart: 0,
+    restrictedLetters: {},
+};
 
 const loadData = () => {
     try {
@@ -59,24 +73,27 @@ const initializeClient = async (): Promise<TelegramClient> => {
 const checkRestrictedLetters = (message: string): string | undefined => {
     const stopLetters: string[] = [];
 
-    data.restrictedLetters.forEach(letter => {
-        if (message.includes(letter)) stopLetters.push(letter);
+    message.split('').forEach(letter => {
+        if (letter in data.restrictedLetters) {
+            if (!stopLetters.includes(letter)) {
+                stopLetters.push(letter);
+                data.restrictedLetters[letter]++;
+            }
+        }
     });
 
     if (stopLetters.length) return `запрещенные буквы (${stopLetters.join(', ')})`;
 };
 
 const checkRestrictedWords = (message: string): string | undefined => {
-    const stemmedStopWords = data.stopWords.map(natural.PorterStemmerRu.stem);
-
     const stopWords: string[] = [];
 
-    natural.PorterStemmerRu.tokenizeAndStem(message).forEach(word => {
-        stemmedStopWords.forEach((stopWord, stopWordsIndex) => {
-            if (word === stopWord) stopWords.push(data.stopWords[stopWordsIndex]);
-        });
-
-        console.log(word);
+    natural.PorterStemmerRu.tokenizeAndStem(message).forEach(stemmedWord => {
+        console.log(stemmedWord, data.stopWords);
+        if (stemmedWord in data.stopWords) {
+            stopWords.push(stemmedWord);
+            data.stopWords[stemmedWord]++;
+        }
     });
 
     if (stopWords.length) return `запрещенные слова (${stopWords.join(', ')})`;
@@ -96,6 +113,33 @@ initializeClient().then(async client => {
             if (event.message instanceof Api.MessageEmpty) return;
 
             console.log(`UpdateNewChannelMessage`);
+
+            const admins = await getAdmins();
+
+            // @ts-ignore
+            const senderId = event.message.fromId?.userId;
+
+            if (senderId) {
+                const admin = admins.find(
+                    admin => senderId && admin.id.valueOf() === senderId.valueOf(),
+                );
+
+                if (admin) {
+                    const match1 = event.message.message.match(
+                        /Добавить стоп-слово ([A-zА-я ,]+)/,
+                    )?.[1];
+                    console.log({ match1 });
+                    if (match1) return addStopWords(match1.split(','));
+
+                    const match2 = event.message.message.match(
+                        /Убрать стоп-слово ([A-zА-я ,]+)/,
+                    )?.[1];
+                    console.log({ match2 });
+                    if (match2) return removeStopWords(match2.split(','));
+
+                    if (event.message.message === 'Хит-парад') return showTopStopWords();
+                }
+            }
 
             let reason =
                 checkRestrictedLetters(event.message.message) ||
@@ -155,14 +199,100 @@ initializeClient().then(async client => {
     const dialogs = await client.getDialogs();
 
     dialog = dialogs.find(x => x.name === 'МойСклад API: сообщество разработчиков')!;
+
+    const admins = await getAdmins();
 });
 
-const sendMessage = async (message: string) => {
-    const result = await client.invoke(
-        new Api.messages.SendMessage({
-            message,
-            peer: dialog.id,
-            silent: true,
-        }),
-    );
+let admins: Api.User[] = [];
+
+const getAdmins = async () => {
+    if (admins.length) return admins;
+    admins = await client.getParticipants(dialog.id!, {
+        filter: new Api.ChannelParticipantsAdmins(),
+        limit: 100,
+        offset: 0,
+    });
+    return admins;
+};
+
+const addStopWords = async (words: string[]) => {
+    if (!words.length) return;
+
+    const addedWords: string[] = [];
+    const existedWords: string[] = [];
+
+    words.forEach(word => {
+        word = word.trim();
+
+        const stemmedWord = natural.PorterStemmerRu.stem(word);
+        if (stemmedWord in data.stopWords) {
+            existedWords.push(word);
+        } else {
+            addedWords.push(word);
+            data.stopWords[stemmedWord] = 0;
+        }
+    });
+
+    const existedWordsMessage = existedWords.length
+        ? `В стоп-лист добавлены слова: ${existedWords.join(', ')}`
+        : '';
+    const addedWordsMessage = addedWords.length
+        ? `В стоп-лист добавлены слова: ${addedWords.join(', ')}`
+        : '';
+
+    client.sendMessage(dialog.id!, {
+        message: [existedWordsMessage, addedWordsMessage].join('\n'),
+        silent: true,
+    });
+};
+
+const removeStopWords = async (words: string[]) => {
+    if (!words.length) return;
+
+    const removedWords: string[] = [];
+    const notExistedWords: string[] = [];
+
+    words.forEach(word => {
+        word = word.trim();
+
+        const stemmedWord = natural.PorterStemmerRu.stem(word);
+        if (stemmedWord in data.stopWords) {
+            delete data[stemmedWord];
+            removedWords.push(word);
+        } else {
+            notExistedWords.push(word);
+        }
+    });
+
+    const notExistedWordsMessage = notExistedWords.length
+        ? `В стоп-листе не найдены слова: ${notExistedWords.join(', ')}`
+        : '';
+    const removedWordsMessage = removedWords.length
+        ? `Из стоп-листа убраны слова: ${removedWords.join(', ')}`
+        : '';
+
+    client.sendMessage(dialog.id!, {
+        message: [notExistedWordsMessage, removedWordsMessage].join('\n'),
+        silent: true,
+    });
+};
+
+const showTopStopWords = () => {
+    let entries = Object.entries(data.stopWords);
+
+    entries = entries.filter(x => x[1] > 0);
+    entries.sort((a, b) => b[1] - a[1]);
+
+    entries = entries.slice(0, 10);
+    let message = `Всего удалено сообщений: ${data.banCounter}\n`;
+    message += `Хит-парад стоп-слов:\n`;
+
+    entries.forEach(([word, quantity], index) => {
+        message += `${word} — ${quantity}\n`;
+    });
+
+    client.sendMessage(dialog.id!, {
+        message,
+        silent: true,
+    });
 };
