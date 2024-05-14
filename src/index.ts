@@ -64,6 +64,9 @@ const initializeClient = async (): Promise<TelegramClient> => {
     fs.writeFileSync('./.session', stringSessionNew, 'utf-8');
 
     loadData();
+
+    console.log(data);
+
     data.restart++;
     setInterval(saveData, 10000);
 
