@@ -29,15 +29,17 @@ const data: {
 
 const loadData = () => {
     try {
-        const savedData = JSON.parse(fs.readFileSync('./.persist', 'utf-8'));
+        const savedData = JSON.parse(fs.readFileSync('./persist.json', 'utf-8'));
         Object.keys(data).forEach(key => {
             if (key in savedData) data[key] = savedData[key];
         });
-    } catch {}
+    } catch {
+        console.error('data not persisted');
+    }
 };
 
 const saveData = () => {
-    fs.writeFileSync('./.persist', JSON.stringify(data, null, 2));
+    fs.writeFileSync('./persist.json', JSON.stringify(data, null, 2));
 };
 
 const initializeClient = async (): Promise<TelegramClient> => {
@@ -64,9 +66,6 @@ const initializeClient = async (): Promise<TelegramClient> => {
     fs.writeFileSync('./.session', stringSessionNew, 'utf-8');
 
     loadData();
-
-    console.log(data);
-
     data.restart++;
     setInterval(saveData, 10000);
 
